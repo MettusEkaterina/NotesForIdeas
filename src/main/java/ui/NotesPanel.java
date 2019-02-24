@@ -9,11 +9,9 @@ import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
+import javax.swing.text.DefaultEditorKit;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -92,6 +90,8 @@ public class NotesPanel {
                 notesManager.syncNoteText(id);
             }
         });
+
+        createPopupMenu();
 
         selectedIndex = 0;
         try {
@@ -254,5 +254,57 @@ public class NotesPanel {
 
     public String getText() {
         return pane.getText();
+    }
+
+    public void createPopupMenu() {
+        JPopupMenu popupMenu = new JPopupMenu();
+
+        JMenuItem cut = new JMenuItem(new DefaultEditorKit.CutAction());
+        cut.setText("Cut");
+        cut.setIcon(PluginIcons.CUT);
+        cut.addMouseListener(new MouseAdapter() {
+            public void mouseReleased(MouseEvent e) {
+                getSelectedNote().setText(pane.getText());
+                notesManager.syncNoteText(id);
+            }
+        });
+
+        JMenuItem copy = new JMenuItem(new DefaultEditorKit.CopyAction());
+        copy.setText("Copy");
+        copy.setIcon(PluginIcons.COPY);
+
+        JMenuItem paste = new JMenuItem(new DefaultEditorKit.PasteAction());
+        paste.setText("Paste");
+        paste.setIcon(PluginIcons.PASTE);
+        paste.addMouseListener(new MouseAdapter() {
+            public void mouseReleased(MouseEvent e) {
+                getSelectedNote().setText(pane.getText());
+                notesManager.syncNoteText(id);
+            }
+        });
+
+        JMenuItem popupList = new JMenuItem("List All Notes", PluginIcons.LIST);
+        popupList.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                listAllNotes();
+                listAllNotes = true;
+            }
+        });
+
+        JMenuItem delete = new JMenuItem("Delete Note", PluginIcons.DELETE);
+        delete.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                deleteNote();
+            }
+        });
+
+        popupMenu.add(cut);
+        popupMenu.add(copy);
+        popupMenu.add(paste);
+        popupMenu.addSeparator();
+        popupMenu.add(popupList);
+        popupMenu.addSeparator();
+        popupMenu.add(delete);
+        pane.addMouseListener(new PopupListener(popupMenu));
     }
 }
