@@ -3,6 +3,7 @@ package ui;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.ui.JBColor;
 import com.intellij.util.ui.JBUI;
+import manager.NotesManager;
 import org.jdom.Element;
 import javax.swing.*;
 import javax.swing.event.AncestorEvent;
@@ -14,27 +15,26 @@ import java.awt.*;
 import java.awt.event.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
-
-import manager.NotesManager;
 
 public class NotesPanel {
     private String id;
-    private JTextPane pane;
     private JPanel panel1;
+    private JTextPane pane;
     private JScrollPane noteScroller;
     private JLabel labelNoteTitle;
     private JPanel actionPanel;
+    private JComboBox comboBoxFontSize;
+    private JComboBox comboBoxFont;
+    private JComboBox comboBoxColor;
+    private JToolBar noteToolBar;
     public Element element;
     private int selectedIndex;
     private Element selectedNote;
     private NotesManager notesManager;
-    private JEditorPane listPane;
+    private JEditorPane searchPane;
+    public Color currentFontColor = new JBColor(new Color(0, 0, 0), new Color(0, 0, 0));
+    private Color currentBackgroundColor;
     public static SimpleDateFormat sdf = new SimpleDateFormat();
-    private Color currentFontColor = new JBColor(new Color(0, 0, 0), new Color(0, 0, 0));
-    private Color currentBackgroundColor = new JBColor(new Color(255, 255, 255), new Color(255, 255, 255));
-    private Font currentFont = new Font("Arial", Font.PLAIN, 16);
-    private boolean listAllNotes = false;
 
     public NotesPanel(final Element element) {
         notesManager = NotesManager.getInstance();
@@ -43,11 +43,83 @@ public class NotesPanel {
         final ActionManager actionManager = ActionManager.getInstance();
         final DefaultActionGroup dag = new DefaultActionGroup();
 
+        String currentFontName = notesManager.getNotesFont().getFontName();
+        String currentFontSize = String.valueOf(notesManager.getNotesFont().getSize());
+        String currentColorName = String.valueOf(notesManager.getColorName());
+        switch(currentColorName){
+            case "yellow":
+                currentBackgroundColor = new JBColor(new Color(253, 254, 192), new Color(253, 254, 192));
+                break;
+            case "green":
+                currentBackgroundColor = new JBColor(new Color(221, 254, 212), new Color(221, 254, 212));
+                break;
+            case "pink":
+                currentBackgroundColor = new JBColor(new Color(254, 224, 251), new Color(254, 224, 251));
+                break;
+            case "purple":
+                currentBackgroundColor = new JBColor(new Color(233, 212, 254), new Color(233, 212, 254));
+                break;
+            case "blue":
+                currentBackgroundColor = new JBColor(new Color(214, 239, 254), new Color(214, 239, 254));
+                break;
+            case "white":
+                currentBackgroundColor = new JBColor(new Color(251, 251, 251), new Color(251, 251, 251));
+                break;
+        }
+
+        String[] fontList = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+        for (String aFontList : fontList) {
+            comboBoxFont.addItem(aFontList);
+        }
+        comboBoxFont.setSelectedItem(currentFontName);
+
+        String[] fontSizes = {"8", "10", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "40", "48", "52", "56", "64", "72", "92"};
+        for (String fontSize : fontSizes) {
+            comboBoxFontSize.addItem(fontSize);
+        }
+        comboBoxFontSize.setSelectedItem(currentFontSize);
+
+        String[] noteColors = {"yellow", "green", "pink", "purple", "blue", "white"};
+        for (String noteColor : noteColors) {
+            comboBoxColor.addItem(noteColor);
+        }
+        comboBoxColor.setSelectedItem(currentColorName);
+
+        comboBoxFont.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                notesManager.setNotesFont(new Font(String.valueOf(comboBoxFont.getSelectedItem()), Font.PLAIN, Integer.parseInt(String.valueOf(comboBoxFontSize.getSelectedItem()))));
+                selectedNote = element.getChildren().get(getSelectedNoteIndex());
+                selectedNote.setAttribute("fontname", String.valueOf(comboBoxFont.getSelectedItem()));
+                notesManager.syncNotePanels(id);
+            }
+        });
+
+        comboBoxFontSize.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                notesManager.setNotesFont(new Font(String.valueOf(comboBoxFont.getSelectedItem()), Font.PLAIN, Integer.parseInt(String.valueOf(comboBoxFontSize.getSelectedItem()))));
+                selectedNote = element.getChildren().get(getSelectedNoteIndex());
+                selectedNote.setAttribute("fontsize", String.valueOf(comboBoxFontSize.getSelectedItem()));
+                notesManager.syncNotePanels(id);
+            }
+        });
+
+        comboBoxColor.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String choice = String.valueOf(comboBoxColor.getSelectedItem());
+                setBackgroundColor(choice);
+                notesManager.setColorName(choice);
+                selectedNote = element.getChildren().get(getSelectedNoteIndex());
+                selectedNote.setAttribute("colorname", choice);
+                notesManager.syncNotePanels(id);
+            }
+        });
+
         dag.addSeparator();
         dag.add(new AnAction("Add Note", "Add Note", PluginIcons.ADD) {
             @Override
             public void actionPerformed(AnActionEvent anActionEvent) {
                 addNewNote("Enter your notes here...");
+                noteToolBar.setVisible(true);
             }
         });
         dag.add(new AnAction("Delete Note", "Delete Note", PluginIcons.DELETE) {
@@ -59,11 +131,11 @@ public class NotesPanel {
         dag.add(new AnAction("Show All Notes", "Show All Notes", PluginIcons.LIST) {
             @Override
             public void actionPerformed(AnActionEvent anActionEvent) {
-                if (listAllNotes) {
+                if (!noteToolBar.isVisible()) {
                     selectNote(getSelectedNoteIndex(), true);
                 } else {
-                    listAllNotes = true;
                     listAllNotes();
+                    noteToolBar.setVisible(false);
                 }
             }
         });
@@ -91,19 +163,23 @@ public class NotesPanel {
             }
         });
 
+        pane.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (pane.getText().equals("Enter your notes here...")) {
+                    pane.select(0, pane.getDocument().getLength());
+                } else {
+                    pane.setCaretPosition(0);
+                }
+            }
+        });
         createPopupMenu();
 
-        selectedIndex = 0;
-        try {
-            selectedIndex = Integer.parseInt(element.getAttributeValue("selectednoteindex"));
-        } catch (NumberFormatException e) {
-            selectedIndex = 0;
-        }
-
+        pane.setMargin(JBUI.insets(5, 10, 5, 10));
+        selectedIndex = Integer.parseInt(element.getAttributeValue("selectednoteindex"));
         notesManager.addNotesPanel(this);
         selectNote(selectedIndex, true);
-        pane.setMargin(JBUI.insets(5, 10, 5, 10));
-        pane.setFont(currentFont);
+        pane.setFont(notesManager.getNotesFont());
         pane.setForeground(currentFontColor);
         pane.setBackground(currentBackgroundColor);
 
@@ -120,13 +196,24 @@ public class NotesPanel {
         });
     }
 
+    private void setSelectedNoteIndex(int index) {
+        selectedIndex = index;
+        element.setAttribute("selectednoteindex", String.valueOf(index));
+    }
+
+    public int getSelectedNoteIndex() {
+        return selectedIndex;
+    }
+
+    private Element getSelectedNote() {
+        return selectedNote;
+    }
+
     public JComponent getRootComponent() {
         return panel1;
     }
 
     public void selectNote(int index, boolean requestFocus) {
-        listAllNotes = false;
-
         if (pane.getParent() == null) {
             noteScroller.getViewport().add(pane);
         }
@@ -136,95 +223,18 @@ public class NotesPanel {
             selectedNote = element.getChildren().get(index);
             pane.setText(selectedNote.getText());
             labelNoteTitle.setText(selectedNote.getAttributeValue("title"));
-
+            pane.setFont(new Font(selectedNote.getAttributeValue("fontname"), Font.PLAIN, Integer.parseInt(selectedNote.getAttributeValue("fontsize"))));
+            notesManager.setColorName(selectedNote.getAttributeValue("colorname"));
+            setBackgroundColor(selectedNote.getAttributeValue("colorname"));
+            comboBoxColor.setSelectedItem(selectedNote.getAttributeValue("colorname"));
+            comboBoxFont.setSelectedItem(selectedNote.getAttributeValue("fontname"));
+            comboBoxFontSize.setSelectedItem(selectedNote.getAttributeValue("fontsize"));
             if (requestFocus) {
                 pane.requestFocus();
             }
         }
-    }
 
-    private void setSelectedNoteIndex(int index) {
-        selectedIndex = index;
-        element.setAttribute("selectednoteindex", String.valueOf(index));
-    }
-
-    private void renameNote() {
-        String notetitle = getSelectedNote().getAttributeValue("title");
-        String title = JOptionPane.showInputDialog(panel1, "Please enter title for this Note", notetitle);
-        if (title != null && title.length() > 0 && !title.equals(notetitle)) {
-            getSelectedNote().setAttribute("title", title);
-            labelNoteTitle.setText(title);
-            notesManager.syncNotePanels(id);
-        }
-    }
-
-    private Element getSelectedNote() {
-        return selectedNote;
-    }
-
-    private void listAllNotes() {
-        if (listPane == null) {
-            listPane = new JEditorPane();
-            listPane.setEditable(false);
-            listPane.setContentType("text/html");
-            listPane.setMargin(JBUI.emptyInsets());
-            listPane.setBackground(JBColor.background());
-            listPane.addHyperlinkListener(new HyperlinkListener() {
-                public void hyperlinkUpdate(HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        setSelectedNoteIndex(Integer.parseInt(e.getURL().getHost()));
-                        selectNote(selectedIndex, true);
-                    }
-                }
-            });
-        }
-        if (listPane.getParent() == null) {
-            noteScroller.getViewport().add(listPane);
-        }
-
-        int foregroundRed = JBColor.foreground().getRed();
-        int foregroundGreen = JBColor.foreground().getGreen();
-        int foregroundBlue = JBColor.foreground().getBlue();
-        String foregroundColor = "rgb(" + foregroundRed + "," + foregroundGreen + "," + foregroundBlue + ")";
-        boolean even = true;
-        StringBuilder sb = new StringBuilder();
-        sb.append("<html><body style='margin:0'>");
-        List list = element.getChildren();
-        for (int i = 0; i < list.size(); i++) {
-            Element e = (Element) list.get(i);
-            String txt = e.getText();
-            int end = 50;
-            if (txt.length() < end) {
-                end = txt.length();
-            }
-            txt = txt.substring(0, end);
-            txt = txt.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\n", "<br>");
-
-            sb.append("<div style='padding:3px;border-bottom:1px solid ").append(foregroundColor).append(";'>");
-            sb.append("<div style='font:bold 10px sans-serif'>");
-            sb.append("<a href='http://").append(i).append("'>");
-            sb.append(e.getAttributeValue("title")).append("</a></div>");
-            sb.append("<table><tr><td style='font:normal 9px verdana;color:gray;padding-left:10px'>").append(txt).append("</td></tr></table>");
-            sb.append("</div>");
-            even = !even;
-        }
-        sb.append("</body></html>");
-        listPane.setText(sb.toString());
-
-        labelNoteTitle.setText("All Notes");
-    }
-
-    public void addNewNote(String notes) {
-        Element note = new Element("note");
-        note.setAttribute("title", sdf.format(new Date()));
-        note.setText(notes);
-        element.addContent(note);
-        selectNote(element.getChildren().size() - 1, true);
-        notesManager.syncNotePanels(id);
-    }
-
-    public int getSelectedNoteIndex() {
-        return selectedIndex;
+        noteToolBar.setVisible(true);
     }
 
     private void deleteNote() {
@@ -244,16 +254,82 @@ public class NotesPanel {
         }
     }
 
+    private void renameNote() {
+        String notetitle = getSelectedNote().getAttributeValue("title");
+        String title = JOptionPane.showInputDialog(panel1, "Please enter title for this Note", notetitle);
+        if (title != null && title.length() > 0 && !title.equals(notetitle)) {
+            getSelectedNote().setAttribute("title", title);
+            labelNoteTitle.setText(title);
+            notesManager.syncNotePanels(id);
+        }
+    }
+
+    private void listAllNotes() {
+        if (searchPane == null) {
+            searchPane = new JEditorPane();
+            searchPane.setEditable(false);
+            searchPane.setContentType("text/html");
+            searchPane.setMargin(JBUI.emptyInsets());
+            searchPane.setBackground(JBColor.background());
+            searchPane.addHyperlinkListener(new HyperlinkListener() {
+                public void hyperlinkUpdate(HyperlinkEvent e) {
+                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                        setSelectedNoteIndex(Integer.parseInt(e.getURL().getHost()));
+                        selectNote(selectedIndex, true);
+                    }
+                }
+            });
+        }
+        if (searchPane.getParent() == null) {
+            noteScroller.getViewport().add(searchPane);
+        }
+
+        int foregroundRed = JBColor.foreground().getRed();
+        int foregroundGreen = JBColor.foreground().getGreen();
+        int foregroundBlue = JBColor.foreground().getBlue();
+        String foregroundColor = "rgb(" + foregroundRed + "," + foregroundGreen + "," + foregroundBlue + ")";
+        boolean even = true;
+        StringBuilder sb = new StringBuilder();
+        sb.append("<html><body style='margin:0'>");
+        java.util.List list = element.getChildren();
+        for (int i = 0; i < list.size(); i++) {
+            Element e = (Element) list.get(i);
+            String txt = e.getText();
+            int end = 50;
+            if (txt.length() < end) {
+                end = txt.length();
+            }
+            txt = txt.substring(0, end);
+            txt = txt.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\n", "<br>");
+
+            sb.append("<div style='padding:3px;border-bottom:1px solid ").append(foregroundColor).append(";'>");
+            sb.append("<div style='font:bold 10px sans-serif'>");
+            sb.append("<a href='http://").append(i).append("'>");
+            sb.append(e.getAttributeValue("title")).append("</a></div>");
+            sb.append("<table><tr><td style='font:normal 9px verdana;color:gray;padding-left:10px'>").append(txt).append("</td></tr></table>");
+            sb.append("</div>");
+            even = !even;
+        }
+        sb.append("</body></html>");
+        searchPane.setText(sb.toString());
+
+        labelNoteTitle.setText("All Notes");
+    }
+
+    public void addNewNote(String notes) {
+        Element note = new Element("note");
+        note.setAttribute("title", sdf.format(new Date()));
+        note.setAttribute("fontname", "Arial");
+        note.setAttribute("fontsize", "12");
+        note.setAttribute("colorname", "yellow");
+        note.setText(notes);
+        element.addContent(note);
+        selectNote(element.getChildren().size() - 1, true);
+        notesManager.syncNotePanels(id);
+    }
+
     public String getId() {
         return id;
-    }
-
-    public void setText(String text) {
-        pane.setText(text);
-    }
-
-    public String getText() {
-        return pane.getText();
     }
 
     public void createPopupMenu() {
@@ -287,7 +363,7 @@ public class NotesPanel {
         popupList.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 listAllNotes();
-                listAllNotes = true;
+                noteToolBar.setVisible(false);
             }
         });
 
@@ -306,5 +382,42 @@ public class NotesPanel {
         popupMenu.addSeparator();
         popupMenu.add(delete);
         pane.addMouseListener(new PopupListener(popupMenu));
+    }
+
+    public String getText() {
+        return pane.getText();
+    }
+
+    public void setText(String text) {
+        pane.setText(text);
+    }
+
+    public void setNotesFont(Font notesFont) {
+        pane.setFont(notesFont);
+    }
+
+    public void setBackgroundColor(String colorName) {
+        Color newColor = null;
+        switch(colorName){
+            case "yellow":
+                newColor = new JBColor(new Color(253, 254, 192), new Color(253, 254, 192));
+                break;
+            case "green":
+                newColor = new JBColor(new Color(221, 254, 212), new Color(221, 254, 212));
+                break;
+            case "pink":
+                newColor = new JBColor(new Color(254, 224, 251), new Color(254, 224, 251));
+                break;
+            case "purple":
+                newColor = new JBColor(new Color(233, 212, 254), new Color(233, 212, 254));
+                break;
+            case "blue":
+                newColor = new JBColor(new Color(214, 239, 254), new Color(214, 239, 254));
+                break;
+            case "white":
+                newColor = new JBColor(new Color(251, 251, 251), new Color(251, 251, 251));
+                break;
+        }
+        pane.setBackground(newColor);
     }
 }

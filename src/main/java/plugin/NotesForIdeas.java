@@ -11,15 +11,18 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import manager.NotesManager;
+import ui.NotesPanel;
 import org.jdom.Element;
 import org.jdom.input.SAXBuilder;
+import org.jdom.output.XMLOutputter;
 import org.xml.sax.InputSource;
-import ui.NotesPanel;
+import java.awt.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.StringReader;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 public class NotesForIdeas implements ApplicationComponent {
     private String enotes = "";
@@ -32,8 +35,8 @@ public class NotesForIdeas implements ApplicationComponent {
         return "Notes For Ideas";
     }
         public void initComponent() {
-            notesElement = readSettings();
-            ProjectManager.getInstance().addProjectManagerListener(new ProjectManagerListener() {
+        notesElement = readSettings();
+        ProjectManager.getInstance().addProjectManagerListener(new ProjectManagerListener() {
             Key noteskey = new Key("notesforideasid");
 
             public void projectOpened(final Project project) {
@@ -55,6 +58,12 @@ public class NotesForIdeas implements ApplicationComponent {
 
             public void projectClosed(final Project project) {
                 NotesManager.getInstance().clearLocks((NotesPanel) project.getUserData(noteskey));
+
+                if (NotesManager.saveSettings(notesElement)) {
+                    enotes = "";
+                } else {
+                    enotes = new XMLOutputter().outputString(notesElement);
+                }
             }
         });
     }
@@ -84,12 +93,28 @@ public class NotesForIdeas implements ApplicationComponent {
         if (element == null) {
             element = new Element("notes");
             element.setAttribute("selectednoteindex", "0");
+            element.setAttribute("fontname", "Arial");
+            element.setAttribute("fontsize", "12");
+            element.setAttribute("colorname", "yellow");
         }
+
+        NotesManager mgr = NotesManager.getInstance();
+        int fontsize = 12;
+        try {
+            fontsize = Integer.parseInt(Objects.requireNonNull(element.getAttributeValue("fontsize")));
+        } catch (NumberFormatException e) {}
+        mgr.setNotesFont(new Font(element.getAttributeValue("fontname"), Font.PLAIN, fontsize));
+
+        String colorName = element.getAttributeValue("colorname");
+        mgr.setColorName(colorName);
 
         List notes = element.getChildren();
         if (notes.size() == 0) {
             Element note = new Element("note");
             note.setAttribute("title", NotesPanel.sdf.format(new Date()));
+            note.setAttribute("fontname", "Arial");
+            note.setAttribute("fontsize", "12");
+            note.setAttribute("colorname", "yellow");
             note.setText("Enter your notes here...");
             element.addContent(note);
         } else {
@@ -97,6 +122,15 @@ public class NotesForIdeas implements ApplicationComponent {
                 Element note = (Element) note1;
                 if (note.getAttributeValue("title") == null) {
                     note.setAttribute("title", "New Note");
+                }
+                if (note.getAttributeValue("fontname") == null) {
+                    note.setAttribute("fontname", "Arial");
+                }
+                if (note.getAttributeValue("fontsize") == null) {
+                    note.setAttribute("fontsize", "12");
+                }
+                if (note.getAttributeValue("colorname") == null) {
+                    note.setAttribute("colorname", "yellow");
                 }
             }
         }

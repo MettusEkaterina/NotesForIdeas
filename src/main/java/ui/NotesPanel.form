@@ -10,7 +10,7 @@
     </properties>
     <border type="none"/>
     <children>
-      <grid id="203f9" layout-manager="GridLayoutManager" row-count="1" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+      <grid id="203f9" layout-manager="GridLayoutManager" row-count="2" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
         <margin top="0" left="0" bottom="0" right="0"/>
         <constraints border-constraint="North"/>
         <properties/>
@@ -51,6 +51,45 @@
               </grid>
             </children>
           </grid>
+          <toolbar id="48c40" binding="noteToolBar">
+            <constraints>
+              <grid row="1" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false">
+                <preferred-size width="-1" height="20"/>
+              </grid>
+            </constraints>
+            <properties>
+              <borderPainted value="false"/>
+              <floatable value="false"/>
+            </properties>
+            <border type="none"/>
+            <children>
+              <component id="2313c" class="javax.swing.JComboBox" binding="comboBoxFont">
+                <constraints/>
+                <properties>
+                  <background color="-1"/>
+                  <editable value="false"/>
+                  <minimumSize width="24" height="24"/>
+                  <preferredSize width="38" height="24"/>
+                </properties>
+              </component>
+              <component id="80125" class="javax.swing.JComboBox" binding="comboBoxFontSize">
+                <constraints/>
+                <properties>
+                  <background color="-1"/>
+                  <maximumSize width="8000" height="32767"/>
+                  <preferredSize width="25" height="24"/>
+                </properties>
+              </component>
+              <component id="8da04" class="javax.swing.JComboBox" binding="comboBoxColor">
+                <constraints/>
+                <properties>
+                  <background color="-1"/>
+                  <maximumSize width="20000" height="32767"/>
+                  <preferredSize width="20" height="24"/>
+                </properties>
+              </component>
+            </children>
+          </toolbar>
         </children>
       </grid>
       <grid id="1df3c" layout-manager="BorderLayout" hgap="0" vgap="0">

@@ -1,9 +1,10 @@
 package manager;
 
+import ui.NotesPanel;
 import org.jdom.Element;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
-import ui.NotesPanel;
+import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -15,6 +16,8 @@ public class NotesManager {
     private HashMap<String, NotesPanel> panelMap;
     private int index = 0;
     private static NotesManager instance = new NotesManager();
+    private Font notesFont = new Font("Arial", Font.PLAIN, 12);
+    private String colorName = "yellow";
 
     private NotesManager() {
         panelMap = new HashMap<>();
@@ -79,6 +82,15 @@ public class NotesManager {
         File settingsFile = getSettingsFile();
         if (settingsFile != null) {
             try {
+                NotesManager mgr = NotesManager.getInstance();
+
+                Font font = mgr.getNotesFont();
+                element.setAttribute("fontname", font.getFontName());
+                element.setAttribute("fontsize", String.valueOf(font.getSize()));
+
+                String colorName = mgr.getColorName();
+                element.setAttribute("colorname", colorName);
+
                 FileOutputStream fos = new FileOutputStream(settingsFile);
                 outputter.setFormat(Format.getPrettyFormat());
                 outputter.output(element, fos);
@@ -102,5 +114,27 @@ public class NotesManager {
                 }
             }
         }
+    }
+
+    public Font getNotesFont() {
+        return notesFont;
+    }
+
+    public void setNotesFont(Font notesFont) {
+        this.notesFont = notesFont;
+        for (String id : panelMap.keySet()) {
+            if (id != null) {
+                NotesPanel qnp = panelMap.get(id);
+                qnp.setNotesFont(notesFont);
+            }
+        }
+    }
+
+    public String getColorName() {
+        return colorName;
+    }
+
+    public void setColorName(String colorName) {
+        this.colorName = colorName;
     }
 }
